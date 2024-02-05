@@ -40,4 +40,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ackr-1.0.0.tar.gz
-        path: /mnt/dist/ackr-*.tar.gz
+        path: /home/runner/work/ackr/ackr/dist/ackr-*.tar.gz
