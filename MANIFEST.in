@@ -1,0 +1,3 @@
+include ackr/templates/*
+include ackr/static/js/*
+include ackr/static/images/*
