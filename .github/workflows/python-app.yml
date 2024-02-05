@@ -36,3 +36,8 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Build package
       run: python -m build
+    - name: Upload build package
+      uses: actions/upload-artifact@v4
+      with:
+        name: ackr-1.0.0.tar.gz
+        path: /mnt/dist/ackr-*.tar.gz
