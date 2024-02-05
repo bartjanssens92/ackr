@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Icinga ackr</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <script type=text/javascript src="/static/js/functions.js"></script>
+  </head>
+  <body>
+    <div class="container-fluid">
+      <div class="row" style="margin-top: 10px;">
+        <div class="col col-10">
+          <img height="40" src="/static/images/logo.svg" type="image/svg+xml" class="float-left" style="margin-right: 10px;">
+          <h1>Icinga ackr</h1>
+        </div>
+        {% if current_user.username %}
+        <div class="col col-2">
+          <p> Logged in as: {{ current_user.username }}</p><p><a class="" href="{{ url_for('logout') }}">(Logout)</a></p>
+        </div>
+        {% endif %}
+      </div>
+      {% block container %}{% endblock %}
+    </div>
+  </body>
+</html>

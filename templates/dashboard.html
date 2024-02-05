@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block container %}
+<div class="sticky-top bg-light" id='messages'>
+  <h5 id='table_messages'></h5>
+</div>
+<div id='table_location'>
+  <table>
+  </table>
+</div>
+<script>
+  generateTable()
+  setInterval(generateTable, 30000)
+</script>
+{% endblock %}
