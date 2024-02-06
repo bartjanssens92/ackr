@@ -5,7 +5,7 @@ class Config(object):
   secret_key = environ.get('SECRET_KEY', 'changeme!')
 
   ldap_dn = environ.get('LDAP_DN', 'dc=some,dc=example,dc=com')
-  ldap_servers = environ.get('LDAP_SERVERS', ['ldap01.some.example.com', 'ldap02.some.example.com'])
+  ldap_servers = environ.get('LDAP_SERVERS', ['ldap01.some.example.com', 'ldap02.some.example.com']).split(',')
   ldap_group = environ.get('LDAP_GROUP', 'icinga')
 
   icinga_username = environ.get('ICINGA_USERNAME', 'icingaapi')
