@@ -24,3 +24,8 @@ Then run the app in gunicorn:
 source params.sh
 gunicorn -w 1 -t 600 -b 0.0.0.0:5000 --log-level DEBUG ackr:app
 ```
+
+## Logo
+
+Vectors and icons by [SVG Repo](https://www.svgrepo.com)
+Link to the [specific logo](https://www.svgrepo.com/svg/72029/field)
