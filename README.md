@@ -1,10 +1,11 @@
+![ackr, logo](ackr/static/images/logo.png)
 # ACKR
 
 Little flask frontend to create a small dashboard to just list the services that have issues from icinga2.
 
 Allows acknowleding services by clicking on the fqdn.
 
-## Example running
+## Running the app
 
 Create a param file with content:
 ```bash
@@ -27,5 +28,10 @@ gunicorn -w 1 -t 600 -b 0.0.0.0:5000 --log-level DEBUG ackr:app
 
 ## Logo
 
-Vectors and icons by [SVG Repo](https://www.svgrepo.com)
-Link to the [specific logo](https://www.svgrepo.com/svg/72029/field)
+Vectors and icons by [SVG Repo](https://www.svgrepo.com), link to the [specific logo](https://www.svgrepo.com/svg/72029/field)
+
+## ToDo
+
+- Improve logging
+- Add support for hosts
+- Add scheduling downtime option
