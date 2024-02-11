@@ -8,11 +8,14 @@
   <body>
     <div class="container-fluid">
       <div class="row" style="margin-top: 10px;">
-        <div class="col col-10">
+        <div class="col col-8">
           <img height="40" src="/static/images/logo.svg" type="image/svg+xml" class="float-left" style="margin-right: 10px;">
           <h1>Icinga ackr</h1>
         </div>
         {% if current_user.username %}
+        <div>
+          <p><input type="checkbox" id="show_all" name="Show all services" value="no" onchange="generateTable()"> Show all services with issues</p>
+        </div>
         <div class="col col-2">
           <p> Logged in as: {{ current_user.username }}</p><p><a class="" href="{{ url_for('logout') }}">(Logout)</a></p>
         </div>
