@@ -87,30 +87,51 @@ def get_services():
   s_unknown = []
   # Only get the 'usefull' keys as otherwise the data returns it way to detailed for what is actually used.
   for service in critical:
+
+    try:
+      notification = service['attrs']['vars']['notification']
+    except KeyError:
+      notification = {'enable': False}
+
     s_critical.append({
       'name': service['attrs']['name'],
       'host_name': service['attrs']['host_name'],
       'display_name': service['attrs']['display_name'],
       'last_state_change': service['attrs']['last_state_change'],
-      'output': service['attrs']['last_check_result']['output']
+      'output': service['attrs']['last_check_result']['output'],
+      'notification': notification
     })
 
   for service in warning:
+
+    try:
+      notification = service['attrs']['vars']['notification']
+    except KeyError:
+      notification = {'enable': False}
+
     s_warning.append({
       'name': service['attrs']['name'],
       'host_name': service['attrs']['host_name'],
       'display_name': service['attrs']['display_name'],
       'last_state_change': service['attrs']['last_state_change'],
-      'output': service['attrs']['last_check_result']['output']
+      'output': service['attrs']['last_check_result']['output'],
+      'notification': notification
     })
 
   for service in unknown:
+
+    try:
+      notification = service['attrs']['vars']['notification']
+    except KeyError:
+      notification = {'enable': False}
+
     s_unknown.append({
       'name': service['attrs']['name'],
       'host_name': service['attrs']['host_name'],
       'display_name': service['attrs']['display_name'],
       'last_state_change': service['attrs']['last_state_change'],
-      'output': service['attrs']['last_check_result']['output']
+      'output': service['attrs']['last_check_result']['output'],
+      'notification': notification
     })
 
   s_critical.sort(key=get_host_name)
@@ -197,3 +218,32 @@ def down_service(service):
   print('Response: ')
   print(r.json())
 
+
+def get_user_info(username):
+  """
+  Function to get the user info to determin what services to show.
+  """
+
+  headers = {
+    'Accept':'application/json'
+  }
+
+  auth = (
+    Config.icinga_username,
+    Config.icinga_password
+  )
+
+  url = ''.join([Config.icinga_backend_url, '/v1/objects/users'])
+  data = {
+    'filter': 'match(s_pattern,user.name)',
+    'filter_vars': {
+      's_pattern': str(username),
+    },
+    'pretty': True,
+  }
+
+  r = requests.get(url, headers=headers, auth=auth, data=json.dumps(data), verify=False)
+  print('Response: ')
+  print(r.json())
+
+  return r.json()['results'][0]['attrs']['groups']

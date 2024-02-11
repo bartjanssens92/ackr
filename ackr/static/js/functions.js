@@ -25,6 +25,21 @@ function remove_message(message_id) {
   message.remove();
 }
 
+function user_notification(service) {
+  // check if "show all notifications" is toggled
+  const checkbox = document.getElementById('show_all');
+  if (checkbox.checked) {
+    return true
+  }
+
+  // check if the notification is enabled
+  if (service['notification']['enable'] == false) {
+    return false
+  }
+  
+  return true
+}
+
 async function generateTable() {
 
   //const msg = document.createElement('p');
@@ -48,14 +63,20 @@ async function generateTable() {
 
     let table_body = document.createElement('tbody');
     let table_head = document.createElement('thead');
+    let filtered_services = [];
+
+    for (let i = 0; i < services[severity].length; ++i) {
+      if (user_notification(services[severity][i])) {
+        filtered_services.push(services[severity][i]);
+      }
+    }
 
     //element.innerHTML = severity;
-    if ( services[severity].length > 0) {
-      //console.log(severity);
+    if ( filtered_services.length > 0) {
       var table_severity = document.createElement('div');
       table_severity.id = severity;
       var table_title = document.createElement('h4');
-      table_title.innerHTML = services[severity].length + ' | ' + severity[0].toUpperCase() + severity.slice(1);
+      table_title.innerHTML = filtered_services.length + ' | ' + severity[0].toUpperCase() + severity.slice(1);
       table_title.style.marginLeft = "10px";
       table_severity.appendChild(table_title);
 
@@ -83,16 +104,19 @@ async function generateTable() {
       tr_header.innerHTML = header;
       table_head.appendChild(tr_header);
 
-      for (let i = 0; i < services[severity].length; ++i) {
-        //console.log(services[severity][i]['display_name']);
-        //service += '<td><div id="service"><button type="button" class="btn btn-block">' + services[severity][i]['host_name'] + '</button></div></td>';
+      for (let i = 0; i < filtered_services.length; ++i) {
+        //console.log(filtered_services[i]['display_name']);
+        //service += '<td><div id="service"><button type="button" class="btn btn-block">' + filtered_services[i]['host_name'] + '</button></div></td>';
+
+        // if the user selected to only show services they get notifications for
+        // then the service should be checked first
         var tr_service = document.createElement('tr');
-        var service_name = services[severity][i]['name'];
-        var service_host_name = services[severity][i]['host_name'];
+        var service_name = filtered_services[i]['name'];
+        var service_host_name = filtered_services[i]['host_name'];
         let service = '';
-        service += '<td><button type="button" id="' + service_host_name + '_' + service_name +'" class="btn btn-block" onclick="ack_service(\'' + service_host_name + '\',\'' + service_name + '\')">' + services[severity][i]['host_name'] + '</button></td>';
-        service += '<td><div id="service">' + services[severity][i]['display_name'] + '</div></td>';
-        service += '<td><div id="service">' + services[severity][i]['output'] + '</div></td>';
+        service += '<td><button type="button" id="' + service_host_name + '_' + service_name +'" class="btn btn-block" onclick="ack_service(\'' + service_host_name + '\',\'' + service_name + '\')">' + filtered_services[i]['host_name'] + '</button></td>';
+        service += '<td><div id="service">' + filtered_services[i]['display_name'] + '</div></td>';
+        service += '<td><div id="service">' + filtered_services[i]['output'] + '</div></td>';
         tr_service.innerHTML = service;
         table_body.appendChild(tr_service);
       }
