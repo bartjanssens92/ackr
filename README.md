@@ -35,8 +35,8 @@ Vectors and icons by [SVG Repo](https://www.svgrepo.com), link to the [specific 
 - Improve logging.
 - Add support for hosts.
 - Add scheduling downtime option.
-- Fix bug where users are shown a "internal server error" if they have logged in on a different device.
 
 ## Done
 
 - Add toggle to show only services the user gets notification for.
+- Fix bug where users are shown a "internal server error" if they have logged in on a different device.
