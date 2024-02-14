@@ -1,5 +1,6 @@
 import os
 
+from time import time
 from ackr import app, login_manager, db
 from ackr import icinga, ldap
 from ackr.models import User
@@ -42,7 +43,7 @@ def login():
 
   if current_user.is_authenticated:
     return redirect(url_for('dashboard'))
-  
+
   form = LoginForm()
   if request.method == 'POST' and form.validate_on_submit():
 
@@ -52,7 +53,7 @@ def login():
       flash('Invalid Username/Password combination')
 
     if ldap.in_group(conn, form.username.data, Config.icinga_group):
-      id = ldap.get_uid(conn, form.username.data)
+      id = str(int(ldap.get_uid(conn, form.username.data)) + int(time()))
       user = User(id = id, username = form.username.data)
       db.session.add(user)
       db.session.commit()
