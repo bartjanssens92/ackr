@@ -246,7 +246,7 @@ def get_user_info(username):
   return r.json()['results'][0]['attrs']['groups']
 
 
-def get_time_periods():
+def get_time_periods(backend):
   """
   Function to get the defined timeperiods
   """
@@ -256,13 +256,13 @@ def get_time_periods():
   }
 
   auth = (
-    Config.icinga_username,
-    Config.icinga_password
+    backend['username'],
+    backend['password']
   )
 
-  url = ''.join([Config.icinga_backend_url, '/v1/objects/timeperiods'])
+  url = ''.join([backend['backend_url'], '/v1/objects/timeperiods'])
 
-  r = requests.get(url, headers=headers, auth=auth, data=json.dumps(data), verify=False)
+  r = requests.get(url, headers=headers, auth=auth, verify=False)
   print('Response: ')
   print(r.json())
 
