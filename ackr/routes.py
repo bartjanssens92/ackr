@@ -1,8 +1,8 @@
-import os
+import os, json
 
 from time import time
 from ackr import app, login_manager, db
-from ackr import icinga, ldap
+from ackr import alertmanager, icinga, ldap
 from ackr.models import User
 from ackr.config import Config
 
@@ -90,14 +90,54 @@ def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static/images'),'logo.png', mimetype='image/logo.png')
 
 
-@app.get('/services')
+@app.get('/backends')
 @login_required
-def get_services():
+def get_backends():
+  """
+  Return a list of all the defined monitoring backends so the frontend can
+  generate all the tabs needed.
+  """
+  backends = []
+  for backend_type in Config.monitoring_backends:
+    for backend in Config.monitoring_backends[backend_type]:
+      backends.append({'id': backend['id'], 'display_name': backend['display_name'], 'type': backend_type})
+
+  return backends, 200
+    
+
+@app.route('/services', methods=['GET'])
+#@login_required
+def services():
   """
   Endpoint to get a json object containing all the services that are in state NOTOK.
   """
-  services = icinga.get_services()
-  return services, 200
+  backend_id = request.args.get('backend_id')
+
+  if backend_id == None:
+    backend_id = 'Default'
+    
+  services = {}
+  for backend_type in Config.monitoring_backends:
+
+    #try:
+    if backend_type == 'icinga2':
+      for backend in Config.monitoring_backends[backend_type]:
+        if backend['id'] == backend_id:
+          services = icinga.get_services(backend)
+          return_code = 200
+    elif backend_type == 'alertmanager':
+      for backend in Config.monitoring_backends[backend_type]:
+        if backend['id'] == backend_id:
+          services = alertmanager.get_services(backend)
+          return_code = 200
+    else:
+      services = '{ "ERROR": "Backend type not supported"}'
+      return_code = 502
+    #except Exception as e:
+    #    services = '{ "ERROR": "' + str(e) + '"}'
+    #    return_code = 502
+
+  return services, return_code
 
 
 @app.route('/ack', methods=["POST"])
@@ -106,6 +146,7 @@ def ack():
   """
   Endpoint to acknoledge a service, the request should contain the service and host names:
   {
+    "backend_id": "Default",
     "host_name": "host01.some.example.com",
     "service_name": "mem"
   }
@@ -113,6 +154,11 @@ def ack():
   if not 'host_name' in request.json or not 'service_name' in request.json:
     return '{"message": "invalid data passed, must include host_name and service_name"}', 502
   else:
-    icinga.ack_service(request.json['host_name'], request.json['service_name'], str(current_user.username)) 
+
+    for backend_type in Config.monitoring_backends:
+      if backend_type == 'icinga2':
+        for backend in Config.monitoring_backends[backend_type]:
+          if backend['id'] == request.json['backend_id']:
+            icinga.ack_service(backend, request.json['host_name'], request.json['service_name'], str(current_user.username)) 
 
   return '{"message": "acked"}', 200
