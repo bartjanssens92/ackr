@@ -1,11 +1,11 @@
-async function ack_service(host_name, service) {
+async function ack_service(backend_id, host_name, service) {
   const button = document.getElementById(host_name + '_' + service);
   button.setAttribute('disabled', true); 
 
   let message_id = host_name + '_' + service;
   add_message('Acknowledging: ' + service + ' on ' + host_name, message_id);
 
-  await doPost('/ack', '{"service_name": "' + service + '", "host_name": "' + host_name + '"}');
+  await doPost('/ack', '{"backend_id": "' + backend_id + '", "service_name": "' + service + '", "host_name": "' + host_name + '"}');
 
   remove_message(message_id);
 }
@@ -40,6 +40,77 @@ function user_notification(service) {
   return true
 }
 
+function show_backend(backend_id) {
+
+  const backend_divs = document.getElementsByClassName("backend_table");
+
+  for (let i = 0; i < backend_divs.length; i++) {
+    if (backend_divs[i].id === 'backend_table_' + backend_id) {
+      backend_divs[i].style.setProperty('display', 'inline');
+    } else {
+      backend_divs[i].style.setProperty('display', 'none');
+    }
+  }
+
+  generateTable();
+
+}
+
+function get_visable_backend() {
+
+  const backend_divs = document.getElementsByClassName("backend_table");
+
+  for (let i = 0; i < backend_divs.length; i++) {
+    if (backend_divs[i].style.display === 'inline') {
+      return backend_divs[i].id;
+    }
+  }
+
+}
+
+async function build_layout() {
+  await generateBackends();
+  generateTable();
+}
+
+async function generateBackends() {
+
+  const table_location = document.getElementById('table_location');
+
+  let backend_table= document.createElement('table');
+  backend_table.classList.add('table');
+  let backend_table_head = document.createElement('tr');
+  let backend_divs = document.createElement('div');
+
+  const backends = await doGet('/backends'); 
+  for (var backend in backends) {
+    var backend_header = document.createElement('td');
+    var sane_backend_name = backends[backend]['id'];
+    var backend_display_name = backends[backend]['display_name'];
+
+    backend_header.innerHTML = '<button type="button" id="' + sane_backend_name + '" class="btn btn-block" onclick="show_backend(\'' + sane_backend_name + '\'' + ')"> ' + backend_display_name + '</button></td>';
+    //backend_header.innerHTML = backends[backend]['name'];
+    backend_header.id = sane_backend_name;
+    backend_table_head.appendChild(backend_header);
+
+    var backend_div = document.createElement('div');
+    backend_div.id = 'backend_table_' + sane_backend_name;
+    backend_div.classList.add('backend_table');
+    backend_div.innerHTML = 'services go here ' + sane_backend_name;
+    if (backend > 0) {
+      backend_div.style.setProperty('display', 'none');
+    } else {
+      backend_div.style.setProperty('display', 'inline');
+    }
+
+    backend_divs.appendChild(backend_div);
+  }    
+
+  backend_table.appendChild(backend_table_head);
+  table_location.appendChild(backend_table);
+  table_location.appendChild(backend_divs);
+}
+
 async function generateTable() {
 
   //const msg = document.createElement('p');
@@ -48,9 +119,12 @@ async function generateTable() {
   msg.innerHTML = "Loading services...";
   //document.body.appendChild(msg);
 
-  const table_location = document.getElementById('table_location');
-
-  const services = await doGet('/services'); 
+  //Only render the complete table for the visable backend
+  backend_div_id = get_visable_backend();
+  const table_location = document.getElementById(backend_div_id);
+  
+  let backend_id = backend_div_id.replace('backend_table_', '');
+  const services = await doGet('/services?backend_id=' + backend_id); 
   msg.innerHTML = "Rendering table...";
 
   let table_div = document.createElement('div');
@@ -61,8 +135,8 @@ async function generateTable() {
     table.classList.add('table');
     table.classList.add('table-striped');
 
-    let table_body = document.createElement('tbody');
     let table_head = document.createElement('thead');
+    let table_body = document.createElement('tbody');
     let filtered_services = [];
 
     for (let i = 0; i < services[severity].length; ++i) {
@@ -90,6 +164,9 @@ async function generateTable() {
         case 'warning':
           table_severity.classList.add('bg-warning');
           break;
+        case 'info':
+          table_severity.classList.add('bg-info');
+          break;
         default:
           table_severity.classList.add('bg-dark');
       }
@@ -114,19 +191,19 @@ async function generateTable() {
         var service_name = filtered_services[i]['name'];
         var service_host_name = filtered_services[i]['host_name'];
         let service = '';
-        service += '<td><button type="button" id="' + service_host_name + '_' + service_name +'" class="btn btn-block" onclick="ack_service(\'' + service_host_name + '\',\'' + service_name + '\')">' + filtered_services[i]['host_name'] + '</button></td>';
+        service += '<td><button type="button" id="' + service_host_name + '_' + service_name +'" class="btn btn-block" onclick="ack_service(\'' + backend_id + '\',\'' + service_host_name + '\',\'' + service_name + '\')">' + filtered_services[i]['host_name'] + '</button></td>';
         service += '<td><div id="service">' + filtered_services[i]['display_name'] + '</div></td>';
         service += '<td><div id="service">' + filtered_services[i]['output'] + '</div></td>';
         tr_service.innerHTML = service;
         table_body.appendChild(tr_service);
       }
+      table.appendChild(table_head);
+      table.appendChild(table_body);
+      table_div.appendChild(table)
+      //table_div.appendChild(document.createElement('br'));
+      //document.body.appendChild(table_div);
+      //document.body.appendChild(document.createElement('br'));
     }
-    table.appendChild(table_head);
-    table.appendChild(table_body);
-    table_div.appendChild(table)
-    //table_div.appendChild(document.createElement('br'));
-    //document.body.appendChild(table_div);
-    //document.body.appendChild(document.createElement('br'));
   }
 
   table_location.replaceChild(table_div, table_location.childNodes[0]);
