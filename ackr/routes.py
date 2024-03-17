@@ -119,23 +119,23 @@ def services():
   services = {}
   for backend_type in Config.monitoring_backends:
 
-    #try:
-    if backend_type == 'icinga2':
-      for backend in Config.monitoring_backends[backend_type]:
-        if backend['id'] == backend_id:
-          objects = icinga.get_services(backend)
-          return_code = 200
-    elif backend_type == 'alertmanager':
-      for backend in Config.monitoring_backends[backend_type]:
-        if backend['id'] == backend_id:
-          objects = alertmanager.get_alerts(backend)
-          return_code = 200
-    else:
-      objects = '{ "ERROR": "Backend type not supported"}'
-      return_code = 502
-    #except Exception as e:
-    #    services = '{ "ERROR": "' + str(e) + '"}'
-    #    return_code = 502
+    try:
+      if backend_type == 'icinga2':
+        for backend in Config.monitoring_backends[backend_type]:
+          if backend['id'] == backend_id:
+            objects = icinga.get_services(backend)
+            return_code = 200
+      elif backend_type == 'alertmanager':
+        for backend in Config.monitoring_backends[backend_type]:
+          if backend['id'] == backend_id:
+            objects = alertmanager.get_alerts(backend)
+            return_code = 200
+      else:
+        objects = '{ "ERROR": "Backend type not supported"}'
+        return_code = 501
+    except Exception as e:
+        objects= '{ "ERROR": "' + str(e) + '"}'
+        return_code = 500
 
   return objects, return_code
 
@@ -154,18 +154,16 @@ def hosts():
   hosts = {}
   for backend_type in Config.monitoring_backends:
 
-    #try:
-    if backend_type == 'icinga2':
-      for backend in Config.monitoring_backends[backend_type]:
-        if backend['id'] == backend_id:
-          return icinga.get_hosts(backend), 200
-    else:
-      e = '{ "ERROR": "Backend type not supported"}'
-      return e, 502
-    #except Exception as e:
-    #    services = '{ "ERROR": "' + str(e) + '"}'
-    #    return_code = 502
-
+    try:
+      if backend_type == 'icinga2':
+        for backend in Config.monitoring_backends[backend_type]:
+          if backend['id'] == backend_id:
+            return icinga.get_hosts(backend), 200
+      else:
+        e = '{ "ERROR": "Backend type not supported"}'
+        return e, 501
+    except Exception as e:
+      return json.dumps({ "ERROR": str(e)}), 500
 
 
 @app.route('/ack', methods=["POST"])
@@ -180,17 +178,20 @@ def ack():
   }
   """
   if not 'host_name' in request.json or not 'service_name' in request.json:
-    return '{"message": "invalid data passed, must include host_name and service_name"}', 502
+    return '{"message": "invalid data passed, must include host_name and service_name"}', 500
   else:
 
-    for backend_type in Config.monitoring_backends:
-      if backend_type == 'icinga2':
-        for backend in Config.monitoring_backends[backend_type]:
-          if backend['id'] == request.json['backend_id']:
-            icinga.ack_service(backend, request.json['host_name'], request.json['service_name'], str(current_user.username)) 
-      if backend_type == 'alertmanager':
-        for backend in Config.monitoring_backends[backend_type]:
-          if backend['id'] == request.json['backend_id']:
-            alertmanager.silence_alert(backend, request.json['host_name'], request.json['service_name'], str(current_user.username)) 
+    try:
+      for backend_type in Config.monitoring_backends:
+        if backend_type == 'icinga2':
+          for backend in Config.monitoring_backends[backend_type]:
+            if backend['id'] == request.json['backend_id']:
+              icinga.ack_service(backend, request.json['host_name'], request.json['service_name'], str(current_user.username)) 
+        if backend_type == 'alertmanager':
+          for backend in Config.monitoring_backends[backend_type]:
+            if backend['id'] == request.json['backend_id']:
+              alertmanager.silence_alert(backend, request.json['host_name'], request.json['service_name'], str(current_user.username)) 
+    except Exception as e:
+      return json.dumps({ "ERROR": str(e)}), 500
 
   return '{"message": "acked"}', 200

@@ -268,7 +268,7 @@ async function doGet(endpoint) {
     });
 
     const response = await fetch(request);
-    if (! response.status === 200) {
+    if (! await response.status === 200) {
       throw new Error('Backend did not return 200')
     }
 
