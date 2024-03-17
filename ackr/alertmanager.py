@@ -4,6 +4,7 @@ import requests
 from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 from ackr.config import Config
+from datetime import datetime, timedelta
 
 def get_host_name(e):
   """
@@ -12,9 +13,27 @@ def get_host_name(e):
   return e['host_name']
 
 
-def get_services(backend):
+def parse_alert(alert):
   """
-  Get all the services that aren't in state ServiceOK.
+  Sub function to get the host_name and alert_type from the passed
+  alert.
+  """
+  alert_type = 'pod'
+  if 'pod' in alert['labels']:
+    host_name = alert['labels']['pod']
+  elif 'instance' in alert['labels']:
+    alert_type = 'instance'
+    host_name = alert['labels']['instance']
+  else:
+    alert_type = 'kube'
+    host_name = 'Kube internals'
+
+  return alert_type, host_name
+
+
+def get_alerts(backend):
+  """
+  Get all the alerts
   """
   warning = []
   critical = []
@@ -30,84 +49,77 @@ def get_services(backend):
   else:
     r = requests.get(url)
 
-  for service in r.json()['data']:
-    if service['labels']['severity'] == 'info':
-      info.append(service)
-    elif service['labels']['severity'] == 'warning':
-      warning.append(service)
-    elif service['labels']['severity'] == 'critical':
-      critical.append(service)
-    elif service['labels']['severity'] == 'none':
-      none.append(service)
+  for alert in r.json()['data']:
+    if alert['status']['state'] == 'suppressed':
+       silenced.append(alert)
+    elif alert['labels']['severity'] == 'info':
+      info.append(alert)
+    elif alert['labels']['severity'] == 'warning':
+      warning.append(alert)
+    elif alert['labels']['severity'] == 'critical':
+      critical.append(alert)
+    elif alert['labels']['severity'] == 'none':
+      none.append(alert)
     else:
-      others.append(service)
+      others.append(alert)
   
-  for service in others:
-    # Debug any services that are not filtered correctly.
-    print(service)
+  for alert in others:
+    # Debug any alerts that are not filtered correctly.
+    print(alert)
     print('--------------------')
   
   s_critical = []
   s_warning = []
   s_info = []
   # Only get the 'usefull' keys as otherwise the data returns it way to detailed for what is actually used.
-  for service in critical:
+  for alert in critical:
 
     try:
-      notification = service['receivers']
+      notification = alert['receivers']
     except KeyError:
       notification = {'enable': False}
 
-    if 'pod' in service['labels']:
-      host_name = service['labels']['pod']
-    elif 'instance' in service['labels']:
-      host_name = service['labels']['instance']
-    else:
-      host_name = 'Kube internals'
+    alert_type, host_name = parse_alert(alert)
     s_critical.append({
+      'name': alert['fingerprint'],
+      'labels': alert['labels'],
       'host_name': host_name,
-      'display_name': service['labels']['alertname'],
-      'output': service['annotations']['description'],
+      'display_name': alert['labels']['alertname'],
+      'output': alert['annotations']['description'],
       'notification': notification
     })
 
-  for service in warning:
+  for alert in warning:
 
     try:
-      notification = service['receivers']
+      notification = alert['receivers']
     except KeyError:
       notification = {'enable': False}
 
-    if 'pod' in service['labels']:
-      host_name = service['labels']['pod']
-    elif 'instance' in service['labels']:
-      host_name = service['labels']['instance']
-    else:
-      host_name = 'Kube internals'
+    alert_type, host_name = parse_alert(alert)
     s_warning.append({
+      'name': alert['fingerprint'],
+      'labels': alert['labels'],
       'host_name': host_name,
-      'display_name': service['labels']['alertname'],
-      'output': service['annotations']['description'],
+      'display_name': alert['labels']['alertname'],
+      'output': alert['annotations']['description'],
       'notification': notification
     })
 
-  for service in info:
+  for alert in info:
 
     try:
-      notification = service['receivers']
+      notification = alert['receivers']
     except KeyError:
       notification = {'enable': False}
 
-    if 'pod' in service['labels']:
-      host_name = service['labels']['pod']
-    elif 'instance' in service['labels']:
-      host_name = service['labels']['instance']
-    else:
-      host_name = 'Kube internals'
+    alert_type, host_name = parse_alert(alert)
     s_info.append({
+      'name': alert['fingerprint'],
+      'labels': alert['labels'],
       'host_name': host_name,
-      'display_name': service['labels']['alertname'],
-      'output': service['annotations']['description'],
+      'display_name': alert['labels']['alertname'],
+      'output': alert['annotations']['description'],
       'notification': notification
     })
 
@@ -118,13 +130,52 @@ def get_services(backend):
   return {'critical': s_critical, 'warning': s_warning, 'info': s_info}
 
 
-def silence_alert(backend, host_name, service_name, author):
+def silence_alert(backend, host_name, alert_fingerprint, author):
   """
-  Function to silence a service defined by host_name and service_name,
+  Function to silence a alert defined by host_name and alert_name,
   this does a post request with a filter to the icinga frontend api.
+  curl https://cluster.internal.org/path/alertmanager/api/v2/silences -H "Content-Type: application/json" -d '{
+    "matchers": [
+      {
+        "name": "env",
+        "value": "pakalu",
+        "isRegex": false
+      }
+    ],
+    "startsAt": "2023-10-25T22:12:33.533330795Z",
+    "endsAt": "2023-10-25T23:11:44.603Z",
+    "createdBy": "api",
+    "comment": "Silence",
+    "status": {
+      "state": "active"
+    }
+  }'
   """
   headers = {
-    'Accept':'application/json'
+    'Content-Type':'application/json'
+  }
+
+  # Get all the labels to only silence the alert that matches the fingerprint
+  matchers = []
+  alerts = get_alerts(backend)
+  for severity in alerts:
+    for alert in alerts[severity]:
+      if alert['name'] == alert_fingerprint:
+        for label in alert['labels']:
+          matchers.append({
+            'name': str(label),
+            'value': str(alert['labels'][label]),
+            'isRegex': False,
+          })
+
+  startsAt = datetime.today()
+  endsAt = startsAt + timedelta(hours=2)
+  data = {
+    'matchers': matchers,
+    'startsAt': startsAt.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+    'endsAt': endsAt.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+    'createdBy': str(author),
+    'comment': 'Acked by ackr',
   }
 
   if 'username' in backend:
@@ -132,24 +183,11 @@ def silence_alert(backend, host_name, service_name, author):
       backend['username'],
       backend['password']
     )
-    url = ''.join([backend['backend_url'], '/v1/actions/acknowledge-problem'])
+    url = ''.join([backend['backend_url'], '/api/v2/silences'])
+    r = requests.post(url, headers=headers, auth=auth, data=json.dumps(data), verify=False)
   else:
-    url = ''.join([backend['backend_url'], '/v1/actions/acknowledge-problem'])
+    url = ''.join([backend['backend_url'], '/api/v2/silences'])
+    r = requests.post(url, headers=headers, data=json.dumps(data), verify=False)
 
-  data = {
-    'type': 'Service',
-    'filter': 'match(s_pattern,service.name) && match(h_pattern,service.host_name)',
-    'filter_vars': {
-      's_pattern': str(service_name),
-      'h_pattern': str(host_name),
-    },
-    'author': str(author),
-    'comment': 'Acked by ackr',
-    'notify': False,
-    'pretty': True,
-    'timestamp': int(time.time()) + 3600
-  }
-
-  r = requests.post(url, headers=headers, auth=auth, data=json.dumps(data), verify=False)
   print('Response: ')
   print(r.json())

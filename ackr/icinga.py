@@ -5,7 +5,7 @@ from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 from ackr.config import Config
 
-def get_hosts():
+def get_hosts(backend):
   """
   Get all the hosts that aren't in state 0
   """
@@ -15,26 +15,55 @@ def get_hosts():
   unknown = []
   other = []
 
-  url = ''.join([Config.icinga_backend_url, '/v1/objects/hosts?filter=host.state!=0'])
+  url = ''.join([backend['backend_url'], '/v1/objects/hosts?filter=host.state!=0'])
 
-  r = requests.get(url, auth=(Config.icinga_username, Config.icinga_password), verify=False)
+  r = requests.get(url, auth=(backend['username'], backend['password']), verify=False)
   for host in r.json()['results']:
     if host['attrs']['acknowledgement'] == 1:
       acked.append(host)
-    elif host['attrs']['downtime_depth'] > 0 or not host['attrs']['last_check_result']['vars_before']['reachable']:
+    elif host['attrs']['downtime_depth'] > 0 or not host['attrs']['last_check_result']['active']:
       downtime.append(host)
-    elif host['attrs']['state'] == 2 and host['attrs']['last_check_result']['vars_before']['reachable']:
+    elif host['attrs']['state'] == 1 and host['attrs']['last_check_result']['active']:
       down.append(host)
-    elif host['attrs']['state'] == 3 and host['attrs']['last_check_result']['vars_before']['reachable']:
+    elif host['attrs']['state'] == 2 and host['attrs']['last_check_result']['active']:
       unknown.append(host)
     else:
       other.append(host)
 
-  print(len(acked))
-  print(len(downtime))
-  print(len(down))
-  print(len(unknown))
-  print(len(other))
+  for host in other:
+    #print(host)
+    print(host['attrs']['state'])
+    print(host['attrs']['last_check_result'])
+    print(host['attrs']['acknowledgement'])
+    print('--------------------')
+
+  h_down = []
+  h_unknown = []
+
+  for host in down:
+    h_down.append({
+      'name': host['attrs']['name'],
+      'host_name': host['attrs']['name'],
+      'display_name': 'Host alive',
+      'last_state_change': host['attrs']['last_state_change'],
+      'output': host['attrs']['last_check_result']['output'],
+      'notification': host['attrs']['vars']['notification']
+    })
+
+  for host in unknown:
+    h_unknown.append({
+      'name': host['attrs']['name'],
+      'host_name': host['attrs']['address'],
+      'display_name': host['attrs']['display_name'],
+      'last_state_change': host['attrs']['last_state_change'],
+      'output': host['attrs']['last_check_result']['output'],
+      'notification': host['attrs']['vars']['notification']
+    })
+
+  h_down.sort(key=get_host_name)
+  h_unknown.sort(key=get_host_name)
+
+  return {'down': h_down, 'unknown': h_unknown}
 
 
 def get_host_name(e):
@@ -61,20 +90,24 @@ def get_services(backend):
   r = requests.get(url, auth=(backend['username'], backend['password']), verify=False)
   for service in r.json()['results']:
   
-    if service['attrs']['acknowledgement'] == 1:
-      acked.append(service)
-    elif service['attrs']['downtime_depth'] > 0 and not 'vars_before' in service['attrs']['last_check_result']:
-      pending.append(service)
-    elif service['attrs']['downtime_depth'] > 0 or not service['attrs']['last_check_result']['vars_before']['reachable']:
-      downtime.append(service)
-    elif service['attrs']['state'] == 1 and service['attrs']['last_check_result']['vars_before']['reachable']:
-      warning.append(service)
-    elif service['attrs']['state'] == 2 and service['attrs']['last_check_result']['vars_before']['reachable']:
-      critical.append(service)
-    elif service['attrs']['state'] == 3 and service['attrs']['last_check_result']['vars_before']['reachable']:
-      unknown.append(service)
-    else:
-      others.append(service)
+    try:
+      if service['attrs']['acknowledgement'] == 1:
+        acked.append(service)
+      elif service['attrs']['downtime_depth'] > 0 and not 'vars_before' in service['attrs']['last_check_result']:
+        pending.append(service)
+      elif service['attrs']['downtime_depth'] > 0 or not service['attrs']['last_check_result']['vars_before']['reachable']:
+        downtime.append(service)
+      elif service['attrs']['state'] == 1 and service['attrs']['last_check_result']['vars_before']['reachable']:
+        warning.append(service)
+      elif service['attrs']['state'] == 2 and service['attrs']['last_check_result']['vars_before']['reachable']:
+        critical.append(service)
+      elif service['attrs']['state'] == 3 and service['attrs']['last_check_result']['vars_before']['reachable']:
+        unknown.append(service)
+      else:
+        others.append(service)
+    except Exception as e:
+       print(service)
+       print('====================')
   
   for service in others:
     # Debug any services that are not filtered correctly.
@@ -159,20 +192,38 @@ def ack_service(backend, host_name, service_name, author):
     backend['password'],
   )
 
-  url = ''.join([backend['backend_url'], '/v1/actions/acknowledge-problem'])
   data = {
-    'type': 'Service',
-    'filter': 'match(s_pattern,service.name) && match(h_pattern,service.host_name)',
-    'filter_vars': {
-      's_pattern': str(service_name),
-      'h_pattern': str(host_name),
-    },
     'author': str(author),
     'comment': 'Acked by ackr',
     'notify': False,
     'pretty': True,
     'timestamp': int(time.time()) + 3600
   }
+
+  ack_filter = {}
+  # If host_name and service_name are equal the type is Host
+  # as the button is generated that way.
+  if host_name == service_name:
+    ack_filter = {  
+      'type': 'Host',
+      'filter': 'match(h_pattern,host.name)',
+      'filter_vars': {
+        'h_pattern': str(host_name),
+      }
+    }
+
+  else:
+    ack_filter = {  
+      'type': 'Service',
+      'filter': 'match(s_pattern,service.name) && match(h_pattern,service.host_name)',
+      'filter_vars': {
+        's_pattern': str(service_name),
+        'h_pattern': str(host_name),
+      }
+    }
+
+  data = { **data, **ack_filter }
+  url = ''.join([backend['backend_url'], '/v1/actions/acknowledge-problem'])
 
   r = requests.post(url, headers=headers, auth=auth, data=json.dumps(data), verify=False)
   print('Response: ')

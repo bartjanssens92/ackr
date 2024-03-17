@@ -52,7 +52,7 @@ function show_backend(backend_id) {
     }
   }
 
-  generateTable();
+  getobjects();
 
 }
 
@@ -70,7 +70,7 @@ function get_visable_backend() {
 
 async function build_layout() {
   await generateBackends();
-  generateTable();
+  getobjects();
 }
 
 async function generateBackends() {
@@ -96,7 +96,7 @@ async function generateBackends() {
     var backend_div = document.createElement('div');
     backend_div.id = 'backend_table_' + sane_backend_name;
     backend_div.classList.add('backend_table');
-    backend_div.innerHTML = 'services go here ' + sane_backend_name;
+    backend_div.innerHTML = 'Loading services...';
     if (backend > 0) {
       backend_div.style.setProperty('display', 'none');
     } else {
@@ -111,7 +111,7 @@ async function generateBackends() {
   table_location.appendChild(backend_divs);
 }
 
-async function generateTable() {
+async function getobjects() {
 
   //const msg = document.createElement('p');
   //msg.id = 'display_message';
@@ -124,38 +124,86 @@ async function generateTable() {
   const table_location = document.getElementById(backend_div_id);
   
   let backend_id = backend_div_id.replace('backend_table_', '');
-  const services = await doGet('/services?backend_id=' + backend_id); 
-  msg.innerHTML = "Rendering table...";
 
+  //Generate the div to hold the renered tables
+  const results_div = document.createElement('div');
+  results_div.id = 'results_' + backend_id;
+
+  //Get the hosts for the visable backend if the type is icinga2
+  const backends = await doGet('/backends'); 
+  for (let i = 0; i < backends.length; ++i) {
+    if (backends[i]['id'] === backend_id) {
+      if (backends[i]['type'] === 'icinga2') {
+
+        //Get the services of the visable backend
+        msg.innerHTML = "Loading hosts...";
+        const hosts = await doGet('/hosts?backend_id=' + backend_id); 
+
+        msg.innerHTML = "Rendering hosts table...";
+        hosts_table = await generateTable(backend_id, hosts);
+
+        results_div.appendChild(hosts_table);
+      }
+    }
+  }
+
+  msg.innerHTML = "Loading services...";
+  //Get the services of the visable backend
+  const services = await doGet('/services?backend_id=' + backend_id); 
+
+  //Filter out the services with notifications if toggled in the ui
+  let filtered_services = {};
+  for (var severity in services) {
+  
+    let filtered_services_array = [];
+    for (let i = 0; i < services[severity].length; ++i) {
+      if (user_notification(services[severity][i])) {
+        filtered_services_array.push(services[severity][i]);
+      }
+    }
+    filtered_services[severity] = filtered_services_array;
+  }
+
+  msg.innerHTML = "Rendering services table...";
+
+  services_table = await generateTable(backend_id, filtered_services);
+  results_div.appendChild(services_table);
+
+  table_location.replaceChild(results_div, table_location.childNodes[0]);
+  const t = new Date();
+  msg.innerHTML = "Table last updated at: " + t.getHours() + ':' + t.getMinutes() + ':' + t.getSeconds();
+}
+
+async function generateTable(backend_id, objects) {
+
+  //Create the div element containing the table
   let table_div = document.createElement('div');
   table_div.classList.add('table-responsive');
 
-  for (var severity in services) {
+  //Add the services to the table
+  for (var severity in objects) {
+
+    //Create the table elements
     let table = document.createElement('table');
     table.classList.add('table');
     table.classList.add('table-striped');
-
     let table_head = document.createElement('thead');
     let table_body = document.createElement('tbody');
-    let filtered_services = [];
 
-    for (let i = 0; i < services[severity].length; ++i) {
-      if (user_notification(services[severity][i])) {
-        filtered_services.push(services[severity][i]);
-      }
-    }
-
-    //element.innerHTML = severity;
-    if ( filtered_services.length > 0) {
+    //Don't bother with empty severities
+    if ( objects[severity].length > 0) {
       var table_severity = document.createElement('div');
       table_severity.id = severity;
       var table_title = document.createElement('h4');
-      table_title.innerHTML = filtered_services.length + ' | ' + severity[0].toUpperCase() + severity.slice(1);
+      table_title.innerHTML = objects[severity].length + ' | ' + severity[0].toUpperCase() + severity.slice(1);
       table_title.style.marginLeft = "10px";
       table_severity.appendChild(table_title);
 
       switch (severity) {
         case 'critical':
+          table_severity.classList.add('bg-danger');
+          break;
+        case 'down':
           table_severity.classList.add('bg-danger');
           break;
         case 'unknown':
@@ -181,36 +229,35 @@ async function generateTable() {
       tr_header.innerHTML = header;
       table_head.appendChild(tr_header);
 
-      for (let i = 0; i < filtered_services.length; ++i) {
-        //console.log(filtered_services[i]['display_name']);
-        //service += '<td><div id="service"><button type="button" class="btn btn-block">' + filtered_services[i]['host_name'] + '</button></div></td>';
-
-        // if the user selected to only show services they get notifications for
-        // then the service should be checked first
+      for (let i = 0; i < objects[severity].length; ++i) {
+        //If the user selected to only show services they get notifications for
+        //then the service should be checked first
         var tr_service = document.createElement('tr');
-        var service_name = filtered_services[i]['name'];
-        var service_host_name = filtered_services[i]['host_name'];
+        var service_name = objects[severity][i]['name'];
+        var service_host_name = objects[severity][i]['host_name'];
+        //Ugly part to get the button in there
         let service = '';
-        service += '<td><button type="button" id="' + service_host_name + '_' + service_name +'" class="btn btn-block" onclick="ack_service(\'' + backend_id + '\',\'' + service_host_name + '\',\'' + service_name + '\')">' + filtered_services[i]['host_name'] + '</button></td>';
-        service += '<td><div id="service">' + filtered_services[i]['display_name'] + '</div></td>';
-        service += '<td><div id="service">' + filtered_services[i]['output'] + '</div></td>';
+        service += '<td><button type="button" id="' + 
+          objects[severity][i]['host_name'] + '_' + 
+          objects[severity][i]['name'] + 
+          '" class="btn btn-block" onclick="ack_service(\'' + 
+          backend_id + '\',\'' + 
+          objects[severity][i]['host_name'] + '\',\'' + 
+          objects[severity][i]['name'] + '\')">' + 
+          objects[severity][i]['host_name'] + '</button></td>';
+
+        service += '<td><div id="service">' + objects[severity][i]['display_name'] + '</div></td>';
+        service += '<td><div id="service">' + objects[severity][i]['output'] + '</div></td>';
         tr_service.innerHTML = service;
         table_body.appendChild(tr_service);
       }
       table.appendChild(table_head);
       table.appendChild(table_body);
-      table_div.appendChild(table)
-      //table_div.appendChild(document.createElement('br'));
-      //document.body.appendChild(table_div);
-      //document.body.appendChild(document.createElement('br'));
+      table_div.appendChild(table);
     }
   }
 
-  table_location.replaceChild(table_div, table_location.childNodes[0]);
-  const t = new Date();
-  msg.innerHTML = "Table last updated at: " + t.getHours() + ':' + t.getMinutes() + ':' + t.getSeconds();
-
-  //msg.style.setProperty('visibility', 'hidden'); 
+  return table_div;
 }
 
 async function doGet(endpoint) {

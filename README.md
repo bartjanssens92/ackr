@@ -73,12 +73,12 @@ Vectors and icons by [SVG Repo](https://www.svgrepo.com), link to the [specific 
 ## ToDo
 
 - Improve logging.
-- Add alertmanager support ( already showing in the interface but no silence function yet ).
-- Add support for hosts.
 - Add scheduling downtime option.
 
 ## Done
 
 - Add toggle to show only services the user gets notification for.
 - Fix bug where users are shown a "internal server error" if they have logged in on a different device.
-- Add multi-backend support
+- Add multi-backend support.
+- Add support for hosts.
+- Add alertmanager support.

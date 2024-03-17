@@ -106,7 +106,7 @@ def get_backends():
     
 
 @app.route('/services', methods=['GET'])
-#@login_required
+@login_required
 def services():
   """
   Endpoint to get a json object containing all the services that are in state NOTOK.
@@ -123,21 +123,49 @@ def services():
     if backend_type == 'icinga2':
       for backend in Config.monitoring_backends[backend_type]:
         if backend['id'] == backend_id:
-          services = icinga.get_services(backend)
+          objects = icinga.get_services(backend)
           return_code = 200
     elif backend_type == 'alertmanager':
       for backend in Config.monitoring_backends[backend_type]:
         if backend['id'] == backend_id:
-          services = alertmanager.get_services(backend)
+          objects = alertmanager.get_alerts(backend)
           return_code = 200
     else:
-      services = '{ "ERROR": "Backend type not supported"}'
+      objects = '{ "ERROR": "Backend type not supported"}'
       return_code = 502
     #except Exception as e:
     #    services = '{ "ERROR": "' + str(e) + '"}'
     #    return_code = 502
 
-  return services, return_code
+  return objects, return_code
+
+
+@app.route('/hosts', methods=['GET'])
+@login_required
+def hosts():
+  """
+  Endpoint to get a json object containing all the hosts that are in state NOTOK.
+  """
+  backend_id = request.args.get('backend_id')
+
+  if backend_id == None:
+    backend_id = 'Default'
+    
+  hosts = {}
+  for backend_type in Config.monitoring_backends:
+
+    #try:
+    if backend_type == 'icinga2':
+      for backend in Config.monitoring_backends[backend_type]:
+        if backend['id'] == backend_id:
+          return icinga.get_hosts(backend), 200
+    else:
+      e = '{ "ERROR": "Backend type not supported"}'
+      return e, 502
+    #except Exception as e:
+    #    services = '{ "ERROR": "' + str(e) + '"}'
+    #    return_code = 502
+
 
 
 @app.route('/ack', methods=["POST"])
@@ -160,5 +188,9 @@ def ack():
         for backend in Config.monitoring_backends[backend_type]:
           if backend['id'] == request.json['backend_id']:
             icinga.ack_service(backend, request.json['host_name'], request.json['service_name'], str(current_user.username)) 
+      if backend_type == 'alertmanager':
+        for backend in Config.monitoring_backends[backend_type]:
+          if backend['id'] == request.json['backend_id']:
+            alertmanager.silence_alert(backend, request.json['host_name'], request.json['service_name'], str(current_user.username)) 
 
   return '{"message": "acked"}', 200
