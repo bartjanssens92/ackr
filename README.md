@@ -69,6 +69,10 @@ source params.sh
 gunicorn -w 1 -t 600 -b 0.0.0.0:5000 --log-level DEBUG ackr:app
 ```
 
+## Screenshots
+![ackr,alertmanager](screenshots/ackr_alertmanager_UI.png)
+![ackr,icinga2](screenshots/ackr_icinga2_UI.png)
+
 ## Logo
 
 Vectors and icons by [SVG Repo](https://www.svgrepo.com), link to the [specific logo](https://www.svgrepo.com/svg/72029/field)
@@ -85,3 +89,4 @@ Vectors and icons by [SVG Repo](https://www.svgrepo.com), link to the [specific 
 - Add multi-backend support.
 - Add support for hosts.
 - Add alertmanager support.
+
