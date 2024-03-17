@@ -1,9 +1,12 @@
 ![ackr, logo](ackr/static/images/logo.png)
 # ACKR
 
-Little flask frontend to create a small dashboard to just list the services that have issues from icinga2.
+Little flask frontend to create a small dashboard to just list:
+- The services that have issues from Icinga2.
+- The hosts that have issues from Icinga2.
+- The alerts from alertmanager.
 
-Allows acknowleding services by clicking on the fqdn.
+Allows acknowleding services and silencing alerts by clicking on the fqdn.
 
 ## Running the app
 
@@ -21,7 +24,7 @@ export ICINGA_GROUP=icinga
 ```
 
 OR
-bash```
+```bash
 export SECRET_KEY=changeme!
 export LDAP_DN=dc=somewhere,dc=example,dc=com
 export LDAP_SERVERS=ldap01.somewhere.example.com,ldap02.somewhere.example.com
