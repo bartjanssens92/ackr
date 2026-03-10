@@ -69,6 +69,15 @@ source params.sh
 gunicorn -w 1 -t 600 -b 0.0.0.0:5000 --log-level DEBUG ackr:app
 ```
 
+## Icinga api permissions
+This is a minimal example for when configuring an apiuser for ackr to contact icinga:
+```bash
+object ApiUser "icingaapi" {
+  password = "somethingsomethingsomethingsecret"
+  permissions = [ "status/query", "objects/query/Host", "objects/query/Service", "actions/acknowledge-problem", ]
+}
+```
+
 ## Screenshots
 ![ackr,alertmanager](screenshots/ackr_alertmanager_UI.png)
 ![ackr,icinga2](screenshots/ackr_icinga2_UI.png)
